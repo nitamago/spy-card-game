@@ -688,12 +688,16 @@ export class Start extends Phaser.Scene {
     カードが一周すると
     出した人が必ず受け取る
 
-    ダミーカード3枚で脱落`,
+    ダミーカード3枚で脱落
+    
+    勝利条件
+    ・Aチーム：Aカードを3枚集める
+    ・Bチーム：Bカードを3枚集める
+    ・Cチーム：最後まで生き残り、単独勝利`,
             {
                 fontSize: "24px",
                 color: "#000",
                 align: "left",
-                wordWrap: { width: 460 }
             }
         )
         .setOrigin(0.5, 0)
@@ -728,21 +732,21 @@ export class Start extends Phaser.Scene {
 
         const rowA = this.makeRuleCardRow(
             w/2 -150,
-            h/2 - 30,
+            h/2 +80,
             "cardA",
             "Aカード\nAチームが3枚集めると勝利"
         );
 
         const rowB = this.makeRuleCardRow(
             w/2  -150,
-            h/2 +50,
+            h/2 +150,
             "cardB",
             "Bカード\nBチームが3枚集めると勝利"
         );
 
         const rowD = this.makeRuleCardRow(
             w/2  -150,
-            h/2 + 130,
+            h/2 + 230,
             "cardDummy",
             "ダミーカード\n3枚受け取ると脱落"
         );
