@@ -154,7 +154,7 @@ export class Start extends Phaser.Scene {
 
         this.selectCardText.setVisible(false);
         
-        this.btnBackToMenu = this.makeButton(550, 570, "メニューに戻る", () => {
+        this.btnBackToMenu = this.makeButton(w/2, h/2+400, "メニューに戻る", () => {
             this.scene.start("Menu");
         });
 
@@ -477,7 +477,9 @@ export class Start extends Phaser.Scene {
         ).setOrigin(0.5);
 
         // Containerにまとめる
-        const container = this.add.container(640, 360, [banner, text])
+        const w = this.scale.width;
+        const h = this.scale.height;
+        const container = this.add.container(w/2, h/2, [banner, text])
             .setDepth(100);
 
         container.setAlpha(0);
