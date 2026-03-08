@@ -82,11 +82,25 @@ export class Start extends Phaser.Scene {
 
         this.isHuman = (i) => i === 0;
 
-        this.uiText = {
-            fontSize: "30px",
-            color: "#ffffff",
-            stroke: "#000000",
-            strokeThickness: 4
+        this.ui = {
+            title: {
+                fontSize: "56px",
+                color: "#ffffff",
+                stroke: "#000000",
+                strokeThickness: 6
+            },
+            normal: {
+                fontSize: "34px",
+                color: "#ffffff",
+                stroke: "#000000",
+                strokeThickness: 4
+            },
+            small: {
+                fontSize: "26px",
+                color: "#ffffff",
+                stroke: "#000000",
+                strokeThickness: 3
+            }
         };
 
         this.addUI();
@@ -114,7 +128,7 @@ export class Start extends Phaser.Scene {
 
             const g = this.add.circle(x, y, 50, 0x666666);
             g.setStrokeStyle(3, 0x000000); 
-            const t = this.add.text(x - 35, y-20, `P${i}`, this.uiText);
+            const t = this.add.text(x - 35, y-20, `P${i}`, this.ui.normal);
 
             this.playerNodes.push(g);
             this.playerTexts.push(t);
@@ -149,7 +163,7 @@ export class Start extends Phaser.Scene {
             w/2-200,
             h/2+400,
             "カードをクリックしてください",
-            this.uiText
+            this.ui.normal
         );
 
         this.selectCardText.setVisible(false);
@@ -248,10 +262,7 @@ export class Start extends Phaser.Scene {
         const dy = 12;
         const bg = this.add.rectangle(x, y, 180, 50, 0x444444).setInteractive();
         const t = this.add.text(x -dx, y-dy, label,
-            {
-                fontSize: "30px",
-                color: "#ffffff",
-            });
+            this.ui.normal);
 
         bg.on("pointerdown", onClick);
         return { bg, t };
@@ -467,13 +478,7 @@ export class Start extends Phaser.Scene {
             0,
             0,
             title,
-            {
-                fontSize: "42px",
-                fontStyle: "bold",
-                color: "#ffffff",
-                stroke: "#000000",
-                strokeThickness: 6
-            }
+            this.ui.title
         ).setOrigin(0.5);
 
         // Containerにまとめる
@@ -696,11 +701,7 @@ export class Start extends Phaser.Scene {
     ・Aチーム：Aカードを3枚集める
     ・Bチーム：Bカードを3枚集める
     ・Cチーム：最後まで生き残り、単独勝利`,
-            {
-                fontSize: "24px",
-                color: "#000",
-                align: "left",
-            }
+            this.ui.small
         )
         .setOrigin(0.5, 0)
         .setDepth(1002);
@@ -710,12 +711,7 @@ export class Start extends Phaser.Scene {
             w/2,
             h/2 + 380,
             "閉じる",
-            {
-                fontSize: "30px",
-                color: "#ffffff",
-                backgroundColor: "#444444",
-                padding: { x: 12, y: 6 }
-            }
+            this.ui.normal
         )
         .setOrigin(0.5)
         .setDepth(1002)
@@ -734,21 +730,21 @@ export class Start extends Phaser.Scene {
 
         const rowA = this.makeRuleCardRow(
             w/2 -150,
-            h/2 +80,
+            h/2 + 110,
             "cardA",
             "Aカード\nAチームが3枚集めると勝利"
         );
 
         const rowB = this.makeRuleCardRow(
             w/2  -150,
-            h/2 +150,
+            h/2 + 180,
             "cardB",
             "Bカード\nBチームが3枚集めると勝利"
         );
 
         const rowD = this.makeRuleCardRow(
             w/2  -150,
-            h/2 + 230,
+            h/2 + 260,
             "cardDummy",
             "ダミーカード\n3枚受け取ると脱落"
         );
@@ -775,10 +771,7 @@ export class Start extends Phaser.Scene {
             50,
             -20,
             text,
-            {
-                fontSize: "24px",
-                color: "#000"
-            }
+            this.ui.small
         );
 
         return this.add.container(x, y, [img, txt]);
