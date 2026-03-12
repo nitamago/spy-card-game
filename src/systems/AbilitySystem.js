@@ -14,6 +14,9 @@ export const Abilities = {
   // },
 
   extraDraw:{
+      description(){
+        return 'hogehoge'
+      },
       canUse(scene, playerIndex, event){
           if(event !== "turnStart") return false;
           if(scene.deck.length > 0) return true;
