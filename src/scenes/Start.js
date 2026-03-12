@@ -39,6 +39,15 @@ const abilityList = [
   "destroyCard",
 ];
 
+const abilityDescriptions = [
+  "次の受信者をスキップできる",
+  "送信方向を逆にできる",
+  "次の受信者に強制受信させることができる",
+  "ターン開始時カードを1枚ドローする",
+  "受信したダミーカードを1枚削除できる",
+  "受信したカードを1枚削除できる",
+];
+
 const playerPositions = [
   { x: 400, y: 500 }, // P0 : 下（プレイヤー）
   { x: 400, y: 100 }, // P1 : 上
@@ -82,7 +91,7 @@ export class Start extends Phaser.Scene {
         this.playerAIs = [];
         for (let i = 0; i < this.playerCount; i++) {
             const idx = charaIndices[i];
-            const p = new Player(Faction[idx], abilityList[idx], charaSpriteList[idx]);
+            const p = new Player(Faction[idx], abilityList[idx], charaSpriteList[idx], abilityDescriptions[idx]);
             this.players.push(p);
             this.playerAIs.push(new AI(p));
         }

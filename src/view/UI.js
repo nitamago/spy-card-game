@@ -204,7 +204,11 @@ export class GameUI {
 
             const container = this.scene.add.container(x, y);
             const s = this.scene.add.image(0, 0, 
-                this.scene.players[i].chara).setScale(0.2);
+                this.scene.players[i].chara).setScale(0.2)
+                .setInteractive();
+            s.on("pointerdown", () => {
+                this.showAbilityInfo(i);
+            });
             const frame = this.scene.add.graphics();
             frame.lineStyle(4, 0xff0000);
             frame.strokeRect(-50, -50, 100, 100);
@@ -506,6 +510,28 @@ export class GameUI {
                 resolve(false);
             });
         })
+    }
+
+    showAbilityInfo(playerIndex){
+        const player = this.scene.players[playerIndex];
+
+        const w = this.scene.scale.width;
+        const h = this.scene.scale.height;
+        const bg = this.scene.add.rectangle(w/2,h/2,400,200,0x000000,0.8);
+
+        const text = this.scene.add.text(
+            w/2,h/2,
+            player.abilityDescription,
+            this.uiStyle.small
+        ).setOrigin(0.5);
+
+        bg.setInteractive();
+
+        bg.on("pointerdown",()=>{
+            bg.destroy();
+            text.destroy();
+        });
+
     }
 }
 
