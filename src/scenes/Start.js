@@ -9,11 +9,34 @@
 import { Player } from '../models/Player.js'
 import { Card } from '../models/Card.js'
 import { AI } from '../AIlogic/AI.js'
+import { Abilities } from '../systems/AbilitySystem.js'
+import { GameUI } from '../view/UI.js'
+import { GameCard } from '../view/Card.js'
 
 const CARD = new Card().CARD;
 
 const Faction = [
     "A", "A", "B", "B", "C", "C"
+];
+
+
+const  charaIndices = [0, 1, 2, 3, 4, 5]
+const charaSpriteList = [
+  "officer",
+  "director",
+  "investor",
+  "growth",
+  "lawyer",
+  "cutter"
+];
+
+const abilityList = [
+  "skipNext",
+  "reverseDirection",
+  "forceReceive",
+  "extraDraw",
+  "ignoreDummy",
+  "destroyCard",
 ];
 
 const playerPositions = [
@@ -26,6 +49,7 @@ const playerPositions = [
 export class Start extends Phaser.Scene {
     constructor() {
         super("Start");
+        this.gameUI = new GameUI(this);
     }
     preload() {
         this.load.image('cardBack', 'assets/00000-1827215688.png');
@@ -36,21 +60,29 @@ export class Start extends Phaser.Scene {
         this.load.image("bannerA", "assets/victoryBannerA.png");
         this.load.image("bannerB", "assets/victoryBannerB.png");
         this.load.image("bannerC", "assets/victoryBannerC.png");
+        this.load.image("officer", "assets/officer.png");
+        this.load.image("director", "assets/director.png");
+        this.load.image("investor", "assets/investor.png");
+        this.load.image("growth", "assets/growth.png");
+        this.load.image("lawyer", "assets/lawyer.png");
+        this.load.image("cutter", "assets/cutter.png");
+        
     }
 
     create(data) {
-        this.cameras.main.setBackgroundColor(0x666666);
-        const w = this.scale.width;
-        const h = this.scale.height;
-        const bg = this.add.image(w/2, h/2-300, "backBoard");
+        this.gameUI.makeBackground();
+        
         
         this.playerCount = data?.playerCount ?? 6;
 
         Phaser.Utils.Array.Shuffle(Faction);
+        Phaser.Utils.Array.Shuffle(charaIndices);
+        
         this.players = [];
         this.playerAIs = [];
         for (let i = 0; i < this.playerCount; i++) {
-            const p = new Player(Faction[i]);
+            const idx = charaIndices[i];
+            const p = new Player(Faction[idx], abilityList[idx], charaSpriteList[idx]);
             this.players.push(p);
             this.playerAIs.push(new AI(p));
         }
@@ -77,196 +109,20 @@ export class Start extends Phaser.Scene {
         this.selectedHandIndex = null;
 
         this.inputLocked = false;
+        this.turnStarted = true;
 
         this.phase = "SEND";
 
+        this.direction = 1;
+        this.discardPile = [];
+
         this.isHuman = (i) => i === 0;
 
-        this.ui = {
-            title: {
-                fontSize: "56px",
-                color: "#ffffff",
-                stroke: "#000000",
-                strokeThickness: 6
-            },
-            normal: {
-                fontSize: "34px",
-                color: "#ffffff",
-                stroke: "#000000",
-                strokeThickness: 4
-            },
-            small: {
-                fontSize: "26px",
-                color: "#ffffff",
-                stroke: "#000000",
-                strokeThickness: 3
-            }
-        };
-
-        this.addUI();
+        this.gameUI.addUI();
         this.redraw();
     }
 
-    addUI() {
-        // ---- UI ----
-        this.playerNodes = [];
-        this.playerTexts = [];
-        this.playerPositions = [];
-        this.backCards = [];
-
-        const w = this.scale.width;
-        const h = this.scale.height;
-        const cx = w/2;
-        const cy = h/2-300;
-        const r = 200;
-
-        for (let i = 0; i < this.playerCount; i++) {
-            const ang = (Math.PI * 2 / this.playerCount) * i - Math.PI / 2;
-
-            const x = cx + Math.cos(ang) * r;
-            const y = cy + Math.sin(ang) * r;
-
-            const g = this.add.circle(x, y, 50, 0x666666);
-            g.setStrokeStyle(3, 0x000000); 
-            const t = this.add.text(x - 35, y-20, `P${i}`, this.ui.normal);
-
-            this.playerNodes.push(g);
-            this.playerTexts.push(t);
-
-            this.playerPositions.push({ x, y });
-            
-            // this.cardRect = this.add.rectangle(400, 250, 60, 80, 0x333399);
-            // this.cardText = this.add.text(385, 240, "?", { fontSize: 24 });
-
-            this.card = this.makeCard('back');
-            this.card.setPosition(cx, cy);
-
-            this.info = this.add.text(20, 20, "");
-            this.gameResult = this.add.text(20, 40, "");
-        }
-        
-        this.btnAccept = this.makeButton(w/2-100, h/2+400, "受け取る", () => {
-            if (this.phase === "RECEIVE_CHOICE" && this.isHuman(this.currentIndex)) {
-                this.acceptCard();
-            }
-        });
-
-        this.btnDecline = this.makeButton(w/2+100, h/2+400, "パス", () => {
-            if (this.phase === "RECEIVE_CHOICE" && this.isHuman(this.currentIndex)) {
-                this.declineCard();
-            }
-        });
-
-        this.handSprites = [];
-
-        this.selectCardText = this.add.text(
-            w/2-200,
-            h/2+400,
-            "カードをクリックしてください",
-            this.ui.normal
-        );
-
-        this.selectCardText.setVisible(false);
-        
-        this.btnBackToMenu = this.makeButton(w/2, h/2+400, "メニューに戻る", () => {
-            this.scene.start("Menu");
-        });
-
-        this.btnBackToMenu.bg.setVisible(false);
-        this.btnBackToMenu.t.setVisible(false);
-
-        this.btnRules = this.makeButton(w/2+250, h/2-600, "ルール", () => {
-            this.showQuickRules();
-        });
-    }
     
-    makeCard(type) {
-        let card;
-        switch(type){
-            case 'A':
-                card = this.add.image(400, 250, 'cardA');
-                break;
-            case 'B':
-                card = this.add.image(400, 250, 'cardB');
-                break;
-            case 'D':
-                card = this.add.image(400, 250, 'cardDummy');
-                break;
-            case 'back':
-                card = this.add.image(400, 250, 'cardBack');
-                break;
-            default:
-                card = this.add.image(400, 250, 'cardBack');
-        }
-        const targetWidth = 80;   // 表示したい横幅(px)
-        const scale = targetWidth / card.width;
-        card.setScale(scale);
-        return card;
-    }
-
-    drawPlayerHand() {
-        // いったん全部消す
-        for (const s of this.handSprites) {
-            s.card.destroy();
-        }
-        this.handSprites.length = 0;
-
-        const hand = this.players[0].hand;
-
-        const w = this.scale.width;
-        const h = this.scale.height;
-        const startX = w/2-150;
-        const y = h/2+500;
-        const gap = 80;
-
-        for (let i = 0; i < hand.length; i++) {
-
-            const x = startX + i * gap;
-
-            // const rect = this.add.rectangle(x, y, 50, 70, 0xffffff)
-            //     .setStrokeStyle(2, 0x000000)
-            //     .setInteractive();   // ★追加
-
-            // const text = this.add.text(
-            //     x - 8,
-            //     y - 12,
-            //     hand[i],
-            //     { fontSize: "20px", color: "#000" }
-            // );
-            const card = this.makeCard(hand[i]);
-            card.setPosition(x, y);
-            card.setInteractive({ useHandCursor: true });
-
-            card.on("pointerdown", () => {
-                // 自分の手番 & SEND フェイズのみ有効
-                if (this.turnPlayer !== 0) return;
-                if (this.phase !== "SEND") return;
-
-                this.selectedHandIndex = i;
-            });
-
-            // ★選択中の見た目
-            if (this.selectedHandIndex === i &&
-                this.turnPlayer === 0 &&
-                this.phase === "SEND") {
-
-                card.setStrokeStyle(3, 0xff0000);
-            }
-
-            this.handSprites.push({card});
-        }
-    }
-
-    makeButton(x, y, label, onClick) {
-        const dx = 40;
-        const dy = 12;
-        const bg = this.add.rectangle(x, y, 180, 50, 0x444444).setInteractive();
-        const t = this.add.text(x -dx, y-dy, label,
-            this.ui.normal);
-
-        bg.on("pointerdown", onClick);
-        return { bg, t };
-    }
 
     createDeck(total) {
         const deck = [];
@@ -279,12 +135,15 @@ export class Start extends Phaser.Scene {
         return deck;
     }
 
-    leftOf(i) {
-        let n = i;
-        do {
-            n = (n + 1) % this.playerCount;
-        } while (this.players[n].eliminated);
-        return n;
+
+    nextPlayer(i){
+        const n = this.players.length;
+        let idx =  (i + this.direction + n) % n;
+        while(this.players[idx].eliminated) {
+            i++;
+            idx =  (i + this.direction + n) % n;
+        }
+        return idx;
     }
 
     update() {
@@ -300,12 +159,19 @@ export class Start extends Phaser.Scene {
             this.endTurn();
             return;
         }
+        
+        // ターン開始能力は1回だけ
+        if (this.turnStarted) {
+            this.turnStarted = false;
+            this.triggerAbility("turnStart", this.turnPlayer);
+        }
 
         let index;
         if (this.isHuman(this.turnPlayer)) {
             // まだ選んでいなければ送信しない
-            if (this.selectedHandIndex === null) return;
-
+            if (this.selectedHandIndex === null) { 
+                return;
+            }
             index = this.selectedHandIndex;
             this.selectedHandIndex = null;
         } else {
@@ -315,20 +181,38 @@ export class Start extends Phaser.Scene {
         this.flowingCard = player.hand.splice(index, 1)[0];
 
         this.senderIndex = this.turnPlayer;
-        this.currentIndex = this.leftOf(this.senderIndex);
-        
+        this.currentIndex = this.nextPlayer(this.senderIndex);
+        if(this.skipNext){
+            this.currentIndex = this.nextPlayer(this.currentIndex);
+            this.skipNext = false;
+        }
+
         const start = this.playerPositions[this.senderIndex];
-        // this.cardRect.setPosition(400, 250);
-        this.card.destroy();
-        this.card = this.makeCard('back');
-        this.card.setPosition(start.x, start.y);
-        // this.cardText.setPosition(385, 240);
-        // this.cardText.setPosition(start.x-15, start.y-10);
+
+        this.gameUI.makeFlowingCard(start.x, start.y);
+        
 
         this.phase = "RECEIVE_CHOICE";
         this.redraw();
-        this.moveCardToPlayer(this.currentIndex, () => {
-            this.tryAIDecision(this.currentIndex);
+        this.gameUI.moveCardToPlayer(this.currentIndex, () => {
+            this.triggerAbility("receiveStart", this.currentIndex);
+            
+            // 強制能力処理
+            const player = this.players[this.currentIndex];
+
+            console.log(this.currentIndex);
+            console.log(player.forceReceive);
+            if(player.forceReceive){
+                player.forceReceive = false;
+                this.acceptCard();
+                return;
+            } else if(player.forcePass){
+                player.forcePass = false;
+                this.declineCard();
+                return;
+            } else {
+                this.tryAIDecision(this.currentIndex);
+            }
         });
 
     }
@@ -339,9 +223,10 @@ export class Start extends Phaser.Scene {
 
         const idx = this.currentIndex;
 
-        this.moveCardToPlayer(idx, () => {
+        this.gameUI.moveCardToPlayer(idx, () => {
 
-            this.flipReveal(this.flowingCard, () => {
+            const gameCard = new GameCard(this);
+            gameCard.flipReveal(this.flowingCard, () => {
 
                 const p = this.players[idx];
                 p.received.push(this.flowingCard);
@@ -352,19 +237,21 @@ export class Start extends Phaser.Scene {
             });
 
         });
+
+        this.direction = 1;
     }
 
     declineCard() {
         if (this.inputLocked) return;
         this.inputLocked = true;
 
-        const next = this.leftOf(this.currentIndex);
+        const next = this.nextPlayer(this.currentIndex);
 
         // 一周して送信者に戻る
         if (next === this.senderIndex) {
             this.currentIndex = this.senderIndex;
 
-            this.moveCardToPlayer(this.currentIndex, () => {
+            this.gameUI.moveCardToPlayer(this.currentIndex, () => {
                 this.forceReceive();
                 this.inputLocked = false;
             });
@@ -375,7 +262,7 @@ export class Start extends Phaser.Scene {
 
         this.redraw();
 
-        this.moveCardToPlayer(this.currentIndex, () => {
+        this.gameUI.moveCardToPlayer(this.currentIndex, () => {
             this.tryAIDecision(this.currentIndex);
             this.inputLocked = false;
         });
@@ -384,9 +271,10 @@ export class Start extends Phaser.Scene {
     forceReceive() {
         const idx = this.currentIndex;
 
-        this.moveCardToPlayer(idx, () => {
+        this.gameUI.moveCardToPlayer(idx, () => {
 
-            this.flipReveal(this.flowingCard, () => {
+            const gameCard = new GameCard(this);
+            gameCard.flipReveal(this.flowingCard, () => {
 
                 const p = this.players[idx];
                 p.received.push(this.flowingCard);
@@ -396,9 +284,12 @@ export class Start extends Phaser.Scene {
             });
 
         });
+        this.direction = 1;
     }
 
-    afterReceive(playerIndex) {    
+    async afterReceive(playerIndex) {   
+        await this.triggerAbility("afterReceive", playerIndex);
+
         this.flowingCard = null;
 
         this.checkEliminate(playerIndex);
@@ -408,7 +299,7 @@ export class Start extends Phaser.Scene {
             this.phase = "GAME_END";
             this.gameResult.setText(`WIN : ${winner}`);
 
-            this.showVictoryBanner(winner);
+            this.gameUI.showVictoryBanner(winner);
 
             this.redraw();
             return;
@@ -453,57 +344,9 @@ export class Start extends Phaser.Scene {
         return null;
     }
 
-    showVictoryBanner(winner) {
-        let key;
-        let title;
-
-        if (winner === "A TEAM") {
-            key = "bannerA";
-            title = "TEAM A VICTORY";
-        }
-        else if (winner === "B TEAM") {
-            key = "bannerB";
-            title = "TEAM B VICTORY";
-        }
-        else {
-            key = "bannerC";
-            title = "TEAM C VICTORY";
-        }
-
-        // バナー画像
-        const banner = this.add.image(0, 0, key).setScale(0.8);
-
-        // テキスト
-        const text = this.add.text(
-            0,
-            0,
-            title,
-            this.ui.title
-        ).setOrigin(0.5);
-
-        // Containerにまとめる
-        const w = this.scale.width;
-        const h = this.scale.height;
-        const container = this.add.container(w/2, h/2, [banner, text])
-            .setDepth(100);
-
-        container.setAlpha(0);
-        container.setScale(0.5);
-
-        // 登場アニメーション
-        this.tweens.add({
-            targets: container,
-            alpha: 1,
-            scale: 1,
-            duration: 600,
-            ease: "Back.Out"
-        });
-
-        this.victoryBanner = container;
-    }
-
     endTurn() {
-        this.turnPlayer = this.leftOf(this.turnPlayer);
+        this.turnStarted = true;
+        this.turnPlayer = this.nextPlayer(this.turnPlayer);
         this.phase = "SEND";
         this.redraw();
     }
@@ -527,253 +370,60 @@ export class Start extends Phaser.Scene {
     }
 
     redraw() {
-        for (let c of this.backCards){
-            c.destroy();
-        }
-        for (let i = 0; i < this.playerCount; i++) {
-            let color = 0x666666;
+        this.gameUI.redraw();
+    } 
 
-            if (this.players[i].eliminated) color = 0x222222;
-            else if (i === this.currentIndex && this.phase === "RECEIVE_CHOICE")
-                color = 0xffff00;
-            else if (i === this.turnPlayer)
-                color = 0x00aa00;
+    async triggerAbility(event, playerIndex){
+        const player = this.players[playerIndex];
+        if(!player) return;
+        if(!player.ability) return;
 
-            this.playerNodes[i].fillColor = color;
+        const ability = Abilities[player.ability];
+        console.log(ability);
 
-            let factionText = "";
-            const p = this.players[i];
-            if (i === 0) {
-                // 自分の所属は常に見える
-                factionText = this.players[i].faction;
+        if(ability){
+            console.log("can use " +ability.canUse(this, playerIndex, event));
+            if(!ability.canUse(this, playerIndex, event)) return;
+            if(!ability.ask()) {
+                ability.use(this, playerIndex);
+                return;
             }
-            else if (this.phase === "GAME_END") {
-                // ゲーム終了後は全員公開
-                factionText = this.players[i].faction;
-            }
-            else if (this.players[i].eliminated) {
-                // 脱落者は公開
-                factionText = this.players[i].faction;
-            }
-            else {
-                // 生存中の他人は非公開
-                factionText = "?";
-            }
-            this.playerTexts[i].setText(
-                `P${i} ${factionText}`
-            );
-            for(let j=0; j<p.hand.length; j++) {
-                const card = this.makeCard('back');
-                this.backCards.push(card);
-                card.setPosition(this.playerTexts[i].x+20*j, this.playerTexts[i].y+70);
-                card.setScale(0.1);
-            }
-            for(let j=0; j<p.received.length; j++) {
-                console.log(p.received[j]);
-                const card = this.makeCard(p.received[j]);
-                card.setPosition(this.playerTexts[i].x+20*j, this.playerTexts[i].y+120);
-                card.setScale(0.1);
-            }
-        }
 
-        if (this.flowingCard) {
-            this.card.setVisible(true);
-            // this.cardText.setVisible(true);
-            // this.cardText.setText("?");
-        } else {
-            this.card.setVisible(false);
-            // this.cardText.setVisible(false);
-        }
-
-        this.info.setText(
-            `TURN:P${this.turnPlayer}  PHASE:${this.phase}`
-        );
-
-        // 受け取りボタンの表示制御（自分にカードが来た時だけ）
-        const show =
-            this.phase === "RECEIVE_CHOICE" &&
-            this.currentIndex === 0;
-
-        this.btnAccept.bg.setVisible(show);
-        this.btnAccept.t.setVisible(show);
-        this.btnDecline.bg.setVisible(show);
-        this.btnDecline.t.setVisible(show);
-
-        this.drawPlayerHand()
-
-        const showSelect =
-            this.phase === "SEND" &&
-            this.turnPlayer === 0;
-
-        this.selectCardText.setVisible(showSelect);
-
-        if (this.phase === "GAME_END") {
-            this.btnBackToMenu.bg.setVisible(true);
-            this.btnBackToMenu.t.setVisible(true);
-        } else {
-            this.btnBackToMenu.bg.setVisible(false);
-            this.btnBackToMenu.t.setVisible(false);
+            await this.askAbilityUse(playerIndex, ability, player.ability);
         }
     }
 
-    moveCardToPlayer(index, onComplete) {
-        const pos = this.playerPositions[index];
-
-        this.tweens.add({
-            targets: [this.card],
-            x: pos.x,
-            y: pos.y,
-            duration: 300,
-            ease: "Sine.easeInOut",
-            onComplete: onComplete
-        });
-    }
-
-    flipReveal(cardValue, onComplete) {
-        // 裏→エッジ
-        this.tweens.add({
-            targets: [this.card],
-            scaleX: 0,
-            duration: 120,
-            ease: "Linear",
-            onComplete: () => {
-
-                // 表示を本当のカードにする
-                const x = this.card.x;
-                const y = this.card.y;
-                this.card.destroy();
-                this.card = this.makeCard(cardValue);
-                this.card.setPosition(x, y);
-
-                // const scale = 80/
-                // エッジ→表
-                this.tweens.add({
-                    targets: [this.card],
-                    // scaleX: scale,
-                    duration: 120,
-                    ease: "Linear",
-                    onComplete: () => {
-                        this.time.delayedCall(500, () => {
-                            if (onComplete) onComplete();
-                        });
-
-                    }
-                });
+    async askAbilityUse(playerIndex, ability, skillName){
+        if(this.isHuman(playerIndex)){
+            await this.gameUI.showAbilityChoice(playerIndex, ability, skillName);
+        }else{
+            if(Math.random() < 0.5){
+                ability.use(this, playerIndex);
             }
-        });
+        }
     }
 
-    showQuickRules() {
-        const w = this.scale.width;
-        const h = this.scale.height;
 
-        // 半透明背景
-        const bg = this.add.rectangle(0, 0, w, h, 0x000000, 0.6)
-            .setOrigin(0)
-            .setDepth(1000)
-            .setInteractive();
+    // flashPlayer(playerIndex){
+    //     const sprite = this.playerSprites[playerIndex];
 
-        // ルールパネル
-        const panel = this.add.rectangle(w/2, h/2, w*0.8, h*0.8, 0xffffff)
-            .setStrokeStyle(4, 0x333333)
-            .setDepth(1001);
+    //     this.tweens.add({
+    //         targets: sprite,
+    //         scale: 1.2,
+    //         duration: 150,
+    //         yoyo: true
+    //     });
+    // }
 
-        const text = this.add.text(
-            w/2,
-            h/2 - 500,
-    `クイックルール
+    // destroyAnimation(card){
+    //     card.setTint(0xff0000);
 
-    目的
-    自分のチームのカードを3枚集めると勝利
-
-    ターン
-    1. 手札からカードを1枚出す
-    2. カードはプレイヤーの間を回る
-    3. 回ってきたら「受け取る」か「パス」
-
-    ルール
-    カードが一周すると
-    出した人が必ず受け取る
-
-    ダミーカード3枚で脱落
-    
-    勝利条件
-    ・Aチーム：Aカードを3枚集める
-    ・Bチーム：Bカードを3枚集める
-    ・Cチーム：最後まで生き残り、単独勝利`,
-            this.ui.small
-        )
-        .setOrigin(0.5, 0)
-        .setDepth(1002);
-
-        // 閉じるボタン
-        const closeBtn = this.add.text(
-            w/2,
-            h/2 + 380,
-            "閉じる",
-            this.ui.normal
-        )
-        .setOrigin(0.5)
-        .setDepth(1002)
-        .setInteractive({ useHandCursor: true });
-
-        const container = this.add.container(0, 0, [
-            bg,
-            panel,
-            text,
-            closeBtn
-        ]).setDepth(1000);
-
-        closeBtn.on("pointerdown", () => {
-            container.destroy();
-        });
-
-        const rowA = this.makeRuleCardRow(
-            w/2 -150,
-            h/2 + 110,
-            "cardA",
-            "Aカード\nAチームが3枚集めると勝利"
-        );
-
-        const rowB = this.makeRuleCardRow(
-            w/2  -150,
-            h/2 + 180,
-            "cardB",
-            "Bカード\nBチームが3枚集めると勝利"
-        );
-
-        const rowD = this.makeRuleCardRow(
-            w/2  -150,
-            h/2 + 260,
-            "cardDummy",
-            "ダミーカード\n3枚受け取ると脱落"
-        );
-
-        container.setScale(0.8);
-        container.setAlpha(0);
-
-        container.add([rowA, rowB, rowD]);
-
-        this.tweens.add({
-            targets: container,
-            scale: 1,
-            alpha: 1,
-            duration: 200,
-            ease: "Quad.Out"
-        });
-    }
-
-    makeRuleCardRow(x, y, key, text) {
-        const img = this.add.image(0, 0, key)
-            .setDisplaySize(60, 84);
-
-        const txt = this.add.text(
-            50,
-            -20,
-            text,
-            this.ui.small
-        );
-
-        return this.add.container(x, y, [img, txt]);
-    }
+    //     this.tweens.add({
+    //         targets: card,
+    //         scale: 0,
+    //         alpha: 0,
+    //         duration: 400,
+    //         onComplete: () => card.destroy()
+    //     });
+    // }
 }
